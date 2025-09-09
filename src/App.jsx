@@ -1,11 +1,41 @@
-import { useState } from "react";
+import { useState, useEffect} from "react";
 import Todo from "./components/Todo";
 import Header from "./components/Header";
 import Wallet from "./components/Wallet";
 import DateTime from "./components/DateTime";
+import SummaryWeek from "./components/SummaryWeek";
 
 function App() {
   const [wallet, setWallet] = useState([]);
+  useEffect(() => {
+    const fetchFromBackend = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/data", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+  
+        // Parse JSON
+        const result = await res.json();
+  
+        // Pastikan data valid
+        const allData = result.data;
+        const latestData = allData[allData.length - 1];
+
+        const loadWallet = latestData.remainBalance
+
+        setWallet([loadWallet])
+        console.log(loadWallet)
+  
+      } catch (err) {
+        console.error("Gagal ambil data dari backend:", err);
+      }
+    };
+  
+    fetchFromBackend();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center p-6 gap-y-10">
@@ -21,6 +51,8 @@ function App() {
         </div>
 
         {/* Optional vertical separator for larger screens */}
+        <div className="hidden md:block border-l border-gray-300"></div>
+        <SummaryWeek />
         <div className="hidden md:block border-l border-gray-300"></div>
 
         {/* Todo Section */}

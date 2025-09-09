@@ -9,8 +9,45 @@ import { useState, useEffect } from "react";
  * @param {Function} setWallet - Function to update the wallet balance
  */
 function Todo({ wallet, setWallet }) {
-  const [task, setTask] = useState({ text: "", qty: "", price: "" });
+  const [task, setTask] = useState({ text: "", source: "", qty: "", price: "", calculateTotal:""});
   const [todos, setTodos] = useState([]);
+
+useEffect(() => {
+  const fetchFromBackend = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/data", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      // Parse JSON
+      const result = await res.json();
+
+      // Pastikan data valid
+      const allData = result.data;
+      const latestData = allData[allData.length - 1];
+
+      if (latestData && latestData.spendingItems) {
+        const loadedTodos = latestData.spendingItems.map((item) => ({
+          text: item.name,
+          source: item.source,
+          qty: item.qty,
+          price: item.price,
+          calculateTotal: item.subtotal, // <== ganti 'subtotal' jadi 'calculateTotal'
+        }));
+        setTodos(loadedTodos);
+        console.log(loadedTodos)
+      }
+
+    } catch (err) {
+      console.error("Gagal ambil data dari backend:", err);
+    }
+  };
+
+  fetchFromBackend();
+}, []);
 
   // Load saved tasks from localStorage on component mount
   useEffect(() => {
@@ -25,18 +62,18 @@ function Todo({ wallet, setWallet }) {
 
   // Add a new task if input is valid
   const addTask = () => {
-    const { text, qty, price } = task;
+    const { text, source, qty, price } = task;
 
     // Validate fields: no empty or zero values
-    if (!text.trim() || !qty || !price) return;
+    if (!text.trim() || !source || !qty || !price) return;
 
     const calculateTotal = Number(qty) * Number(price);
-    const newTask = { text, qty, price, calculateTotal };
+    const newTask = { text, source, qty, price, calculateTotal };
 
     // Add the new task to the existing list by creating a new array (immutable update)
     setTodos([...todos, newTask]);
 
-    setTask({ text: "", qty: "", price: "" });
+    setTask({ text: "", source: "", qty: "", price: "" });
   };
 
   // Remove task by index
@@ -49,7 +86,7 @@ function Todo({ wallet, setWallet }) {
   const totalPrice = todos.reduce((acc, todo) => acc + todo.calculateTotal, 0);
 
   // Handle submit: deduct total from wallet if balance is sufficient
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     // If the wallet array is empty or undefined, default to 0 to prevent errors.
@@ -61,13 +98,45 @@ function Todo({ wallet, setWallet }) {
     }
 
     setWallet([currentMoney - totalPrice]);
+
+    //For connect data frontend to mongoDB thought backend
+    try {
+      //fetch data from backend
+      const response = await fetch("http://localhost:5000/api/data", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        //parser to json all of data
+        body: JSON.stringify({
+          currentBalance: wallet[0],
+          totalSpending: totalPrice,
+          date: new Date().toISOString(),
+          spendingItems: todos.map((item) => ({
+            name: item.text,
+            source: item.source,
+            qty: Number (item.qty),
+            price: Number(item.price),
+            subtotal: Number(item.calculateTotal)
+          })),
+        }),
+      });
+
+      //response sign the data success to mongodb
+      const result = await response.json();
+      console.log("Submitted:", result);
+    } catch (error) {
+      console.error("Error submitting data:", error);
+    }
   };
 
   return (
-    <div className="max-w-2xl p-2 bg-white shadow-md rounded-lg min-h-[450px]">
+    <div className="max-w-4xl p-2 bg-white shadow-md rounded-lg min-h-[450px]">
       {/* Labels for input fields */}
       <div className="flex flex-row mb-1 mr-2 gap-x-45">
         <h3 className="text-lg font-semibold">Item:</h3>
+        <h3 className="text-lg font-semibold">Source:</h3>
         <h3 className="text-lg font-semibold">Qty:</h3>
         <h3 className="text-lg font-semibold">Price:</h3>
       </div>
@@ -79,6 +148,14 @@ function Todo({ wallet, setWallet }) {
           value={task.text}
           onChange={(e) => setTask({ ...task, text: e.target.value })}
           placeholder="Add item"
+          className="mb-2 p-2 border border-gray-300 rounded"
+          onKeyDown={(e) => e.key === "Enter" && addTask()}
+        />
+        <input
+          type="text"
+          value={task.source}
+          onChange={(e) => setTask({ ...task, source: e.target.value })}
+          placeholder="Add source"
           className="mb-2 p-2 border border-gray-300 rounded"
           onKeyDown={(e) => e.key === "Enter" && addTask()}
         />
@@ -106,7 +183,8 @@ function Todo({ wallet, setWallet }) {
           <thead className="sticky top-0 bg-white z-10">
             <tr>
               <th className="border border-gray-300 p-2">No</th>
-              <th className="border border-gray-300 p-2">Name</th>
+              <th className="border border-gray-300 p-2">Item</th>
+              <th className="border border-gray-300 p-2">Source</th>
               <th className="border border-gray-300 p-2">Qty</th>
               <th className="border border-gray-300 p-2">Price</th>
               <th className="border border-gray-300 p-2">Subtotal</th>
@@ -121,6 +199,9 @@ function Todo({ wallet, setWallet }) {
                 </td>
                 <td className="border border-gray-300 p-2 text-center">
                   {todo.text}
+                </td>
+                <td className="border border-gray-300 p-2 text-center">
+                  {todo.source}
                 </td>
                 <td className="border border-gray-300 p-2 text-center">
                   {todo.qty}

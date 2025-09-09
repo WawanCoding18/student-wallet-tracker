@@ -10,6 +10,7 @@ import { useState, useEffect } from "react";
  */
 function Wallet({ wallet, setWallet }) {
   const [money, setMoney] = useState("");
+  
 
   // Handle form submission: prevent default, add new amount, and reset input
   const handleSubmit = (e) => {
